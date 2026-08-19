@@ -1,21 +1,63 @@
+// app.js — simple FFConnect app
 (function () {
   "use strict";
 
   // =========================
-  // FFConnect - Simple App
+  // STORAGE KEYS
   // =========================
+  const USERS_KEY = "ff_users_v2";
+  const POSTS_KEY = "ff_posts_v2";
+  const CURRENT_KEY = "ff_current_v2";
+  const NOTIF_KEY = "ff_notifications_v2";
 
-  const USERS_KEY = "ff_users";
-  const POSTS_KEY = "ff_posts";
-  const CURRENT_KEY = "ff_current";
+  // =========================
+  // HELPERS
+  // =========================
+  const $ = id => document.getElementById(id);
 
-  // ---------- Helpers ----------
+  const searchInput = $("searchInput");
+  const searchBtn = $("searchBtn");
+  const feedList = $("feedList");
+  const postText = $("postText");
+  const postCreateBtn = $("postCreateBtn");
+  const accountArea = $("accountArea");
+  const profileMenu = $("profileMenu");
 
+  const authModal = $("authModal");
+  const authSubmit = $("authSubmit");
+  const authToggle = $("authToggle");
+  const authTitle = $("authTitle");
+  const authMsg = $("authMsg");
+  const authUsername = $("authUsername");
+  const authPassword = $("authPassword");
+  const authBio = $("authBio");
+  const authReferral = $("authReferral");
+
+  const myProfileBtn = $("myProfileBtn");
+  const newPostBtn = $("newPostBtn");
+
+  const followingList = $("followingList");
+  const suggestionsList = $("suggestionsList");
+
+  const notificationsDrawer = $("notificationsDrawer");
+  const notifBtn = $("notifBtn");
+  const notifBadge = $("notifBadge");
+  const notificationsList = $("notificationsList");
+
+  const searchResults = $("searchResults");
+  const profileDrawer = $("profileDrawer");
+  const profileContent = $("profileContent");
+
+  let authMode = "register";
+
+  // =========================
+  // STORAGE
+  // =========================
   function getData(key, fallback) {
     try {
       const data = localStorage.getItem(key);
       return data ? JSON.parse(data) : fallback;
-    } catch (error) {
+    } catch (e) {
       return fallback;
     }
   }
@@ -24,57 +66,7 @@
     localStorage.setItem(key, JSON.stringify(value));
   }
 
-  function currentUser() {
-    return getData(CURRENT_KEY, null);
-  }
-
-  function escapeHtml(text) {
-    return String(text)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
-
-  function makeId() {
-    return Date.now() + Math.floor(Math.random() * 1000);
-  }
-
-  // ---------- Get HTML elements ----------
-
-  const searchInput = document.getElementById("searchInput");
-  const searchBtn = document.getElementById("searchBtn");
-  const searchResults = document.getElementById("searchResults");
-
-  const feedList = document.getElementById("feedList");
-  const postText = document.getElementById("postText");
-  const postCreateBtn = document.getElementById("postCreateBtn");
-
-  const accountArea = document.getElementById("accountArea");
-  const profileMenu = document.getElementById("profileMenu");
-
-  const authModal = document.getElementById("authModal");
-  const authSubmit = document.getElementById("authSubmit");
-  const authToggle = document.getElementById("authToggle");
-  const authTitle = document.getElementById("authTitle");
-  const authMsg = document.getElementById("authMsg");
-
-  const authUsername = document.getElementById("authUsername");
-  const authPassword = document.getElementById("authPassword");
-  const authBio = document.getElementById("authBio");
-
-  const profileDrawer = document.getElementById("profileDrawer");
-  const profileContent = document.getElementById("profileContent");
-
-  const myProfileBtn = document.getElementById("myProfileBtn");
-  const newPostBtn = document.getElementById("newPostBtn");
-
-  let authMode = "register";
-
-  // ---------- Users ----------
-
-  function getUsers() {
+  function loadUsers() {
     return getData(USERS_KEY, []);
   }
 
@@ -82,9 +74,7 @@
     saveData(USERS_KEY, users);
   }
 
-  // ---------- Posts ----------
-
-  function getPosts() {
+  function loadPosts() {
     return getData(POSTS_KEY, []);
   }
 
@@ -92,24 +82,104 @@
     saveData(POSTS_KEY, posts);
   }
 
-  // ---------- Demo users ----------
+  function loadNotifs() {
+    return getData(NOTIF_KEY, []);
+  }
 
-  function setupDemoData() {
+  function saveNotifs(notifs) {
+    saveData(NOTIF_KEY, notifs);
+  }
+
+  function currentUser() {
+    return getData(CURRENT_KEY, null);
+  }
+
+  function setCurrentUser(user) {
+    saveData(CURRENT_KEY, user);
+    renderAll();
+  }
+
+  function logout() {
+    localStorage.removeItem(CURRENT_KEY);
+    renderAll();
+  }
+
+  function now() {
+    return Date.now();
+  }
+
+  function uid() {
+    return Date.now() + Math.floor(Math.random() * 100000);
+  }
+
+  function escapeHtml(text) {
+    return String(text || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  // =========================
+  // REFERRAL CODE
+  // =========================
+  function generateReferralCode(username) {
+    const users = loadUsers();
+
+    let code;
+
+    do {
+      const random = Math.random()
+        .toString(36)
+        .substring(2, 8)
+        .toUpperCase();
+
+      const base = String(username || "USER")
+        .substring(0, 4)
+        .toUpperCase();
+
+      code = base + "-" + random;
+    } while (users.some(user => user.referralCode === code));
+
+    return code;
+  }
+
+  function countReferrals(username) {
+    return loadUsers().filter(
+      user => user.referredBy === username
+    ).length;
+  }
+
+  // =========================
+  // STARTER DATA
+  // =========================
+  function seed() {
     if (!localStorage.getItem(USERS_KEY)) {
       saveUsers([
         {
           username: "alice",
           password: "alice",
-          bio: "Welcome to FFConnect!",
+          profile: {
+            bio: "Welcome to FFConnect",
+            location: "Lagos"
+          },
           followers: [],
-          following: []
+          following: [],
+          referralCode: generateReferralCode("alice"),
+          referredBy: null
         },
         {
           username: "bob",
           password: "bob",
-          bio: "Building cool things.",
+          profile: {
+            bio: "Building cool things",
+            location: "Abuja"
+          },
           followers: [],
-          following: []
+          following: [],
+          referralCode: generateReferralCode("bob"),
+          referredBy: null
         }
       ]);
     }
@@ -117,27 +187,32 @@
     if (!localStorage.getItem(POSTS_KEY)) {
       savePosts([
         {
-          id: makeId(),
+          id: uid(),
           author: "alice",
           text: "Welcome to FFConnect!",
           likes: [],
           comments: [],
-          createdAt: Date.now()
+          createdAt: now()
         },
         {
-          id: makeId(),
+          id: uid(),
           author: "bob",
-          text: "Hello everyone 👋",
+          text: "Follow someone and leave a comment.",
           likes: [],
           comments: [],
-          createdAt: Date.now()
+          createdAt: now()
         }
       ]);
     }
+
+    if (!localStorage.getItem(NOTIF_KEY)) {
+      saveNotifs([]);
+    }
   }
 
-  // ---------- Authentication ----------
-
+  // =========================
+  // AUTH
+  // =========================
   function openAuth() {
     if (!authModal) return;
 
@@ -149,6 +224,8 @@
     }
   }
 
+  window.openAuth = openAuth;
+
   function closeAuth() {
     if (!authModal) return;
 
@@ -156,31 +233,17 @@
     authModal.setAttribute("aria-hidden", "true");
   }
 
-  function showMessage(message, success) {
-    if (!authMsg) return;
-
-    authMsg.textContent = message;
-    authMsg.style.color = success ? "green" : "red";
-  }
-
-  function toggleAuth() {
-    authMode =
-      authMode === "register"
-        ? "login"
-        : "register";
+  function toggleAuthMode() {
+    authMode = authMode === "register" ? "login" : "register";
 
     if (authTitle) {
       authTitle.textContent =
-        authMode === "register"
-          ? "Create an account"
-          : "Log in";
+        authMode === "register" ? "Create an account" : "Log in";
     }
 
     if (authSubmit) {
       authSubmit.textContent =
-        authMode === "register"
-          ? "Create account"
-          : "Log in";
+        authMode === "register" ? "Create account" : "Log in";
     }
 
     if (authToggle) {
@@ -189,8 +252,13 @@
           ? "Switch to Log in"
           : "Switch to Create";
     }
+  }
 
-    showMessage("", true);
+  function showAuthMessage(message, success = false) {
+    if (!authMsg) return;
+
+    authMsg.textContent = message;
+    authMsg.style.color = success ? "#16a34a" : "#b91c1c";
   }
 
   function submitAuth() {
@@ -199,111 +267,147 @@
     const username = authUsername.value.trim();
     const password = authPassword.value;
     const bio = authBio ? authBio.value.trim() : "";
+    const referral = authReferral
+      ? authReferral.value.trim()
+      : "";
 
     if (!username || !password) {
-      showMessage("Enter a username and password.", false);
+      showAuthMessage("Enter username and password.");
       return;
     }
 
-    const users = getUsers();
+    const users = loadUsers();
 
+    // REGISTER
     if (authMode === "register") {
-
       const exists = users.some(
         user =>
           user.username.toLowerCase() === username.toLowerCase()
       );
 
       if (exists) {
-        showMessage("Username already exists.", false);
+        showAuthMessage("Username already exists.");
         return;
+      }
+
+      let referredBy = null;
+
+      if (referral) {
+        const owner = users.find(
+          user =>
+            user.referralCode &&
+            user.referralCode.toLowerCase() ===
+              referral.toLowerCase()
+        );
+
+        if (owner) {
+          referredBy = owner.username;
+        }
       }
 
       const newUser = {
         username: username,
         password: password,
-        bio: bio,
+        profile: {
+          bio: bio,
+          location: ""
+        },
         followers: [],
-        following: []
+        following: [],
+        referralCode: generateReferralCode(username),
+        referredBy: referredBy
       };
 
       users.push(newUser);
       saveUsers(users);
 
-      saveData(CURRENT_KEY, {
+      setCurrentUser({
         username: username
       });
 
       closeAuth();
-      renderAccount();
-      renderFeed();
 
-    } else {
+      alert("Account created successfully!");
 
-      const user = users.find(
-        item =>
-          item.username.toLowerCase() === username.toLowerCase() &&
-          item.password === password
-      );
-
-      if (!user) {
-        showMessage("Wrong username or password.", false);
-        return;
-      }
-
-      saveData(CURRENT_KEY, {
-        username: user.username
-      });
-
-      closeAuth();
-      renderAccount();
-      renderFeed();
+      clearAuthInputs();
+      return;
     }
 
-    authUsername.value = "";
-    authPassword.value = "";
+    // LOGIN
+    const found = users.find(
+      user =>
+        user.username.toLowerCase() === username.toLowerCase() &&
+        user.password === password
+    );
 
-    if (authBio) {
-      authBio.value = "";
+    if (!found) {
+      showAuthMessage("Wrong username or password.");
+      return;
     }
+
+    setCurrentUser({
+      username: found.username
+    });
+
+    closeAuth();
+
+    clearAuthInputs();
   }
 
-  // ---------- Account ----------
-
-  function logout() {
-    localStorage.removeItem(CURRENT_KEY);
-    renderAccount();
-    renderFeed();
+  function clearAuthInputs() {
+    if (authUsername) authUsername.value = "";
+    if (authPassword) authPassword.value = "";
+    if (authBio) authBio.value = "";
+    if (authReferral) authReferral.value = "";
   }
 
-  function renderAccount() {
+  // =========================
+  // ACCOUNT
+  // =========================
+  function renderAccountArea() {
     if (!accountArea) return;
 
     const current = currentUser();
 
     if (!current) {
       accountArea.innerHTML = `
-        <button class="btn" id="openLoginButton">
+        <button class="btn" id="openAuthButton">
           Create account / Log in
         </button>
       `;
 
-      const button = document.getElementById("openLoginButton");
+      const button = $("openAuthButton");
 
       if (button) {
         button.addEventListener("click", openAuth);
       }
 
+      if (profileMenu) {
+        profileMenu.innerHTML = `
+          <button class="btn secondary" id="signInButton">
+            Sign in
+          </button>
+        `;
+
+        $("signInButton").addEventListener(
+          "click",
+          openAuth
+        );
+      }
+
       return;
     }
 
-    const users = getUsers();
-
-    const user = users.find(
-      item => item.username === current.username
+    const user = loadUsers().find(
+      u => u.username === current.username
     );
 
-    if (!user) return;
+    if (!user) {
+      logout();
+      return;
+    }
+
+    const referrals = countReferrals(user.username);
 
     accountArea.innerHTML = `
       <div>
@@ -311,48 +415,54 @@
       </div>
 
       <div class="small">
-        ${escapeHtml(user.bio || "")}
+        ${escapeHtml(user.profile?.bio || "")}
       </div>
 
-      <br>
+      <div style="margin-top:8px">
+        Referral code:
+        <strong>${escapeHtml(user.referralCode)}</strong>
+      </div>
 
-      <button class="btn" id="logoutButton">
-        Log out
-      </button>
+      <div class="small">
+        Successful referrals: ${referrals}
+      </div>
+
+      <div style="margin-top:8px">
+        <button class="btn" id="logoutButton">
+          Log out
+        </button>
+
+        <button class="btn secondary" id="editButton">
+          Edit profile
+        </button>
+      </div>
     `;
 
-    const logoutButton =
-      document.getElementById("logoutButton");
+    $("logoutButton").addEventListener("click", logout);
 
-    if (logoutButton) {
-      logoutButton.addEventListener("click", logout);
-    }
+    $("editButton").addEventListener("click", () => {
+      openProfileEdit(user.username);
+    });
 
     if (profileMenu) {
       profileMenu.innerHTML = `
         <button class="btn secondary" id="profileButton">
-          My Profile
+          Profile
         </button>
       `;
 
-      document
-        .getElementById("profileButton")
-        ?.addEventListener("click", function () {
-          openProfileFor(user.username);
-        });
+      $("profileButton").addEventListener("click", () => {
+        openProfileFor(user.username);
+      });
     }
+
+    renderFollowingList();
   }
 
-  // ---------- Create Post ----------
-
+  // =========================
+  // POSTS
+  // =========================
   function createPost() {
-    const current = currentUser();
-
-    if (!current) {
-      openAuth();
-      return;
-    }
-
     if (!postText) return;
 
     const text = postText.value.trim();
@@ -362,15 +472,22 @@
       return;
     }
 
-    const posts = getPosts();
+    const current = currentUser();
+
+    if (!current) {
+      openAuth();
+      return;
+    }
+
+    const posts = loadPosts();
 
     posts.unshift({
-      id: makeId(),
+      id: uid(),
       author: current.username,
       text: text,
       likes: [],
       comments: [],
-      createdAt: Date.now()
+      createdAt: now()
     });
 
     savePosts(posts);
@@ -380,87 +497,93 @@
     renderFeed();
   }
 
-  // ---------- Feed ----------
-
   function renderFeed() {
     if (!feedList) return;
 
-    const posts = getPosts();
+    const posts = loadPosts();
 
     feedList.innerHTML = "";
 
     if (posts.length === 0) {
-      feedList.innerHTML = `
-        <div class="card">
-          No posts yet.
-        </div>
-      `;
+      feedList.innerHTML =
+        '<div class="card small">No posts yet.</div>';
       return;
     }
 
     posts.forEach(post => {
+      const element = document.createElement("div");
 
-      const div = document.createElement("div");
+      element.className = "post card";
 
-      div.className = "post card";
+      element.innerHTML = `
+        <div class="meta">
+          <div>
+            <strong>${escapeHtml(post.author)}</strong>
 
-      div.innerHTML = `
-        <div>
-          <strong>${escapeHtml(post.author)}</strong>
+            <div class="small">
+              ${new Date(post.createdAt).toLocaleString()}
+            </div>
+          </div>
+
+          <button
+            class="btn secondary"
+            onclick="openProfileFor('${escapeHtml(post.author)}')"
+          >
+            View
+          </button>
         </div>
 
-        <div class="small">
-          ${new Date(post.createdAt).toLocaleString()}
-        </div>
-
-        <p>
+        <div class="text">
           ${escapeHtml(post.text)}
-        </p>
+        </div>
 
         <div class="actions">
 
           <button
-            class="btn secondary likeButton"
-            data-id="${post.id}">
+            class="like-btn"
+            data-id="${post.id}"
+          >
             👍 ${post.likes.length}
           </button>
 
           <button
-            class="btn secondary profileButton"
-            data-user="${escapeHtml(post.author)}">
-            Profile
+            class="btn secondary comment-toggle"
+            data-id="${post.id}"
+          >
+            💬 Comment (${post.comments.length})
           </button>
 
         </div>
+
+        <div
+          class="comment-area"
+          id="comments-${post.id}"
+          style="display:none"
+        ></div>
       `;
 
-      feedList.appendChild(div);
+      feedList.appendChild(element);
+    });
+
+    document.querySelectorAll(".like-btn").forEach(button => {
+      button.addEventListener("click", () => {
+        toggleLike(Number(button.dataset.id));
+      });
     });
 
     document
-      .querySelectorAll(".likeButton")
+      .querySelectorAll(".comment-toggle")
       .forEach(button => {
-
-        button.addEventListener("click", function () {
-          likePost(Number(this.dataset.id));
+        button.addEventListener("click", () => {
+          toggleComments(Number(button.dataset.id));
         });
-
-      });
-
-    document
-      .querySelectorAll(".profileButton")
-      .forEach(button => {
-
-        button.addEventListener("click", function () {
-          openProfileFor(this.dataset.user);
-        });
-
       });
   }
 
-  // ---------- Likes ----------
-
-  function likePost(postId) {
+  // =========================
+  // LIKES
+  // =========================
+  function toggleLike(postId) {
     const current = currentUser();
 
     if (!current) {
@@ -468,21 +591,27 @@
       return;
     }
 
-    const posts = getPosts();
+    const posts = loadPosts();
 
-    const post = posts.find(
-      item => item.id === postId
-    );
+    const post = posts.find(p => p.id === postId);
 
     if (!post) return;
 
     post.likes = post.likes || [];
 
-    const index =
-      post.likes.indexOf(current.username);
+    const index = post.likes.indexOf(
+      current.username
+    );
 
     if (index === -1) {
       post.likes.push(current.username);
+
+      if (post.author !== current.username) {
+        addNotification(
+          post.author,
+          current.username + " liked your post."
+        );
+      }
     } else {
       post.likes.splice(index, 1);
     }
@@ -490,193 +619,336 @@
     savePosts(posts);
 
     renderFeed();
+    updateBadges();
   }
 
-  // ---------- Profiles ----------
+  // =========================
+  // COMMENTS
+  // =========================
+  function toggleComments(postId) {
+    const area = $("comments-" + postId);
 
-  function openProfileFor(username) {
-    const users = getUsers();
+    if (!area) return;
 
-    const user = users.find(
-      item => item.username === username
-    );
-
-    if (!user || !profileDrawer || !profileContent) {
-      return;
+    if (area.style.display === "none") {
+      area.style.display = "block";
+      renderComments(postId);
+    } else {
+      area.style.display = "none";
     }
+  }
 
-    const posts = getPosts().filter(
-      post => post.author === username
+  function renderComments(postId) {
+    const area = $("comments-" + postId);
+
+    if (!area) return;
+
+    const post = loadPosts().find(
+      p => p.id === postId
     );
 
-    profileContent.innerHTML = `
-      <h2>${escapeHtml(user.username)}</h2>
+    if (!post) return;
 
-      <p>
-        ${escapeHtml(user.bio || "No bio yet.")}
-      </p>
+    post.comments = post.comments || [];
 
-      <p>
-        Followers: ${user.followers.length}
-      </p>
+    area.innerHTML = `
+      <textarea
+        id="commentInput-${postId}"
+        placeholder="Write a comment..."
+      ></textarea>
 
-      <p>
-        Following: ${user.following.length}
-      </p>
+      <button
+        class="btn"
+        id="commentButton-${postId}"
+      >
+        Reply
+      </button>
 
-      <hr>
+      <div class="comment-list">
+        ${post.comments
+          .map(
+            comment => `
+              <div class="comment">
+                <strong>
+                  ${escapeHtml(comment.author)}
+                </strong>
 
-      <h3>Posts</h3>
-
-      <div>
-        ${
-          posts.length
-            ? posts.map(post => `
-                <div class="card">
-                  ${escapeHtml(post.text)}
+                <div>
+                  ${escapeHtml(comment.text)}
                 </div>
-              `).join("")
-            : "<p>No posts yet.</p>"
-        }
+              </div>
+            `
+          )
+          .join("")}
       </div>
     `;
 
+    $("commentButton-" + postId).addEventListener(
+      "click",
+      () => submitComment(postId)
+    );
+  }
+
+  function submitComment(postId) {
+    const current = currentUser();
+
+    if (!current) {
+      openAuth();
+      return;
+    }
+
+    const input = $("commentInput-" + postId);
+
+    if (!input) return;
+
+    const text = input.value.trim();
+
+    if (!text) return;
+
+    const posts = loadPosts();
+
+    const post = posts.find(
+      p => p.id === postId
+    );
+
+    if (!post) return;
+
+    post.comments = post.comments || [];
+
+    post.comments.push({
+      id: uid(),
+      author: current.username,
+      text: text,
+      createdAt: now()
+    });
+
+    savePosts(posts);
+
+    if (post.author !== current.username) {
+      addNotification(
+        post.author,
+        current.username + " commented on your post."
+      );
+    }
+
+    renderFeed();
+    updateBadges();
+  }
+
+  // =========================
+  // FOLLOW SYSTEM
+  // =========================
+  function toggleFollow(username) {
+    const current = currentUser();
+
+    if (!current) {
+      openAuth();
+      return;
+    }
+
+    if (current.username === username) return;
+
+    const users = loadUsers();
+
+    const me = users.find(
+      u => u.username === current.username
+    );
+
+    const other = users.find(
+      u => u.username === username
+    );
+
+    if (!me || !other) return;
+
+    me.following = me.following || [];
+    other.followers = other.followers || [];
+
+    const index = me.following.indexOf(username);
+
+    if (index === -1) {
+      me.following.push(username);
+
+      if (!other.followers.includes(me.username)) {
+        other.followers.push(me.username);
+      }
+
+      addNotification(
+        username,
+        me.username + " started following you."
+      );
+    } else {
+      me.following.splice(index, 1);
+
+      const followerIndex =
+        other.followers.indexOf(me.username);
+
+      if (followerIndex !== -1) {
+        other.followers.splice(followerIndex, 1);
+      }
+    }
+
+    saveUsers(users);
+
+    renderAll();
+  }
+
+  window.toggleFollow = toggleFollow;
+
+  function renderFollowingList() {
+    if (!followingList) return;
+
+    const current = currentUser();
+
+    followingList.innerHTML = "";
+
+    if (!current) return;
+
+    const user = loadUsers().find(
+      u => u.username === current.username
+    );
+
+    if (!user) return;
+
+    (user.following || []).forEach(username => {
+      const li = document.createElement("li");
+
+      li.innerHTML = `
+        <button
+          class="btn secondary"
+          onclick="openProfileFor('${escapeHtml(username)}')"
+        >
+          ${escapeHtml(username)}
+        </button>
+      `;
+
+      followingList.appendChild(li);
+    });
+  }
+
+  function renderSuggestions() {
+    if (!suggestionsList) return;
+
+    const current = currentUser();
+    const users = loadUsers();
+
+    suggestionsList.innerHTML = "";
+
+    users
+      .filter(user =>
+        current
+          ? user.username !== current.username
+          : true
+      )
+      .slice(0, 5)
+      .forEach(user => {
+        const li = document.createElement("li");
+
+        li.innerHTML = `
+          <div>
+            <strong>
+              ${escapeHtml(user.username)}
+            </strong>
+
+            <div class="small">
+              ${escapeHtml(user.profile?.bio || "")}
+            </div>
+
+            <button
+              class="btn"
+              onclick="openProfileFor('${escapeHtml(user.username)}')"
+            >
+              View
+            </button>
+
+            ${
+              current
+                ? `
+                  <button
+                    class="btn secondary"
+                    onclick="toggleFollow('${escapeHtml(user.username)}')"
+                  >
+                    Follow
+                  </button>
+                `
+                : ""
+            }
+          </div>
+        `;
+
+        suggestionsList.appendChild(li);
+      });
+  }
+
+  // =========================
+  // PROFILES
+  // =========================
+  function openProfile() {
+    if (!profileDrawer) return;
+
     profileDrawer.style.display = "block";
-    profileDrawer.setAttribute("aria-hidden", "false");
+    profileDrawer.setAttribute(
+      "aria-hidden",
+      "false"
+    );
+  }
+
+  function closeProfile() {
+    if (!profileDrawer) return;
+
+    profileDrawer.style.display = "none";
+    profileDrawer.setAttribute(
+      "aria-hidden",
+      "true"
+    );
+  }
+
+  function openProfileFor(username) {
+    openProfile();
+    renderProfile(username);
   }
 
   window.openProfileFor = openProfileFor;
 
-  // ---------- Search ----------
+  function openProfileEdit(username) {
+    openProfile();
+    renderProfile(username, true);
+  }
 
-  function searchUsers() {
-    if (!searchInput || !searchResults) return;
+  function renderProfile(username, edit = false) {
+    if (!profileContent) return;
 
-    const query =
-      searchInput.value.trim().toLowerCase();
+    const users = loadUsers();
 
-    if (!query) {
-      searchResults.innerHTML = "";
-      return;
-    }
-
-    const users = getUsers();
-
-    const results = users.filter(user =>
-      user.username.toLowerCase().includes(query)
+    const user = users.find(
+      u => u.username === username
     );
 
-    searchResults.innerHTML = "";
+    if (!user) return;
 
-    if (results.length === 0) {
-      searchResults.innerHTML =
-        "<p>No users found.</p>";
-      return;
-    }
+    if (edit) {
+      profileContent.innerHTML = `
+        <h3>Edit profile</h3>
 
-    results.forEach(user => {
+        <input
+          id="editBio"
+          placeholder="Bio"
+          value="${escapeHtml(user.profile?.bio || "")}"
+        >
 
-      const div = document.createElement("div");
+        <input
+          id="editLocation"
+          placeholder="Location"
+          value="${escapeHtml(user.profile?.location || "")}"
+        >
 
-      div.className = "card";
+        <button class="btn" id="saveProfile">
+          Save
+        </button>
 
-      div.innerHTML = `
-        <strong>${escapeHtml(user.username)}</strong>
-        <div class="small">
-          ${escapeHtml(user.bio || "")}
-        </div>
-        <br>
         <button
           class="btn secondary"
-          data-user="${escapeHtml(user.username)}">
-          View profile
+          id="cancelProfile"
+        >
+          Cancel
         </button>
       `;
-
-      div
-        .querySelector("button")
-        .addEventListener("click", function () {
-          openProfileFor(this.dataset.user);
-        });
-
-      searchResults.appendChild(div);
-    });
-  }
-
-  // ---------- Buttons ----------
-
-  if (authSubmit) {
-    authSubmit.addEventListener(
-      "click",
-      submitAuth
-    );
-  }
-
-  if (authToggle) {
-    authToggle.addEventListener(
-      "click",
-      toggleAuth
-    );
-  }
-
-  if (postCreateBtn) {
-    postCreateBtn.addEventListener(
-      "click",
-      createPost
-    );
-  }
-
-  if (searchBtn) {
-    searchBtn.addEventListener(
-      "click",
-      searchUsers
-    );
-  }
-
-  if (searchInput) {
-    searchInput.addEventListener(
-      "keydown",
-      function (event) {
-        if (event.key === "Enter") {
-          searchUsers();
-        }
-      }
-    );
-  }
-
-  if (newPostBtn) {
-    newPostBtn.addEventListener(
-      "click",
-      function () {
-        postText?.focus();
-        window.scrollTo({
-          top: 0,
-          behavior: "smooth"
-        });
-      }
-    );
-  }
-
-  if (myProfileBtn) {
-    myProfileBtn.addEventListener(
-      "click",
-      function () {
-        const current = currentUser();
-
-        if (!current) {
-          openAuth();
-          return;
-        }
-
-        openProfileFor(current.username);
-      }
-    );
-  }
-
-  // ---------- Start App ----------
-
-  setupDemoData();
-  renderAccount();
-  renderFeed();
-
-})();
