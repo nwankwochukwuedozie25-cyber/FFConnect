@@ -1,0 +1,46 @@
+/* styles.css — FFConnect original branding */
+:root{
+  --brand:#0b7a5a; /* green-teal */
+  --muted:#64748b;
+  --bg: #f7fbf9;
+  --card:#ffffff;
+}
+*{box-sizing:border-box}
+body{Margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial;background:var(--bg);color:#06201a}
+.app-header{position:sticky;top:0;z-index:20;display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:linear-gradient(90deg,var(--brand),#0c9d73);color:#fff}
+.brand{font-weight:800;font-size:18px}
+.header-actions{display:flex;align-items:center;gap:8px}
+.search{padding:8px 10px;border-radius:8px;border:none;width:200px}
+.icon-btn{background:transparent;border:none;color:inherit;font-size:18px;cursor:pointer}
+.badge{background:#ef4444;color:#fff;padding:2px 6px;border-radius:999px;font-size:12px;margin-left:6px}
+.app-main{display:grid;grid-template-columns:220px 1fr 260px;gap:12px;padding:12px;max-width:1100px;margin:0 auto}
+.left-panel,.right-panel{display:flex;flex-direction:column;gap:12px}
+.card{background:var(--card);padding:12px;border-radius:12px;box-shadow:0 8px 24px rgba(2,6,23,0.06)}
+.btn{background:var(--brand);color:#fff;border:none;padding:10px 12px;border-radius:10px;cursor:pointer;font-weight:700}
+.btn.secondary{background:#eef6f3;color:var(--brand);font-weight:700}
+.row{display:flex;gap:8px;align-items:center}
+.feed{display:flex;flex-direction:column;gap:12px}
+textarea{width:100%;min-height:84px;padding:10px;border-radius:10px;border:1px solid #e6f2ec}
+small, .small{font-size:13px;color:var(--muted)}
+.post{padding:12px;border-radius:10px;background:linear-gradient(180deg,#fff,#fcfffd);margin-bottom:8px;border:1px solid #f1f6f3}
+.post .meta{display:flex;justify-content:space-between;align-items:center}
+.post .text{margin-top:8px;white-space:pre-wrap}
+.actions{display:flex;gap:8px;margin-top:10px}
+.like-btn{background:#eef6f3;border:none;padding:8px;border-radius:8px;cursor:pointer}
+.comment-list{margin-top:8px;border-top:1px dashed #eef6f3;padding-top:8px}
+.comment{padding:8px;border-radius:8px;background:#f9fff9;margin-top:6px}
+.small-list{list-style:none;padding:0;margin:0}
+.small-list li{padding:6px 0;border-bottom:1px dashed #f0f6f3}
+.whatsapp-link{display:inline-block;margin-top:8px;background:#25D366;color:#fff;padding:8px 10px;border-radius:999px;text-decoration:none;font-weight:700}
+.hidden-sm{display:block}
+.modal{position:fixed;inset:0;background:rgba(2,6,23,0.4);display:flex;align-items:center;justify-content:center;padding:12px}
+.modal[aria-hidden="true"]{display:none}
+.modal-content{background:var(--card);padding:16px;border-radius:12px;width:100%;max-width:420px}
+.drawer{position:fixed;right:12px;bottom:12px;width:360px;max-height:70vh;background:var(--card);border-radius:12px;box-shadow:0 8px 30px rgba(2,6,23,0.12);overflow:auto}
+.drawer[aria-hidden="true"]{display:none}
+.drawer-header{display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid #eef6f3}
+.drawer-body{padding:12px}
+.close-btn{background:transparent;border:none;cursor:pointer}
+.profile-menu{min-width:120px}
+.app-footer{text-align:center;padding:18px;color:var(--muted)}
+@media(max-width:900px){.app-main{grid-template-columns:1fr;padding:10px}.left-panel{order:2}.right-panel{order:3}.feed{order:1}.hidden-sm{display:none}.search{width:120px}}
