@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FFConnect</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f2f4f7;
+      color: #222;
+    }
+
+    header {
+      background: #1877f2;
+      color: white;
+      padding: 18px;
+      text-align: center;
+      font-size: 28px;
+      font-weight: bold;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 20px auto;
+      padding: 10px;
+    }
+
+    .card {
+      background: white;
+      padding: 18px;
+      margin-bottom: 15px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    textarea {
+      width: 100%;
+      height: 90px;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      resize: none;
+      font-size: 16px;
+    }
+
+    button {
+      background: #1877f2;
+      color: white;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 8px;
+      margin-top: 10px;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    .post {
+      border-top: 1px solid #eee;
+      padding-top: 15px;
+      margin-top: 15px;
+    }
+
+    .name {
+      font-weight: bold;
+      font-size: 17px;
+    }
+
+    .like {
+      background: #eee;
+      color: #222;
+      margin-right: 8px;
+    }
+
+    footer {
+      text-align: center;
+      padding: 20px;
+      color: #777;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    🌐 FFConnect
+  </header>
+
+  <div class="container">
+
+    <div class="card">
+      <h2>Welcome to FFConnect</h2>
+      <p>Connect, share and communicate with friends.</p>
+    </div>
+
+    <div class="card">
+      <h3>Create a post</h3>
+
+      <textarea id="postText"
+        placeholder="What's on your mind?"></textarea>
+
+      <button onclick="createPost()">
+        Post
+      </button>
+    </div>
+
+    <div class="card">
+      <h3>Posts</h3>
+
+      <div id="posts">
+
+        <div class="post">
+          <div class="name">FFConnect User</div>
+          <p>Welcome to FFConnect! 🎉</p>
+
+          <button class="like" onclick="likePost(this)">
+            👍 Like <span>0</span>
+          </button>
+
+          <button onclick="alert('Comments coming soon!')">
+            💬 Comment
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    © 2026 FFConnect
+  </footer>
+
+  <script>
+    function createPost() {
+      const text = document.getElementById("postText").value.trim();
+
+      if (text === "") {
+        alert("Please write something first.");
+        return;
+      }
+
+      const post = document.createElement("div");
+      post.className = "post";
+
+      post.innerHTML = `
+        <div class="name">You</div>
+        <p>${text}</p>
+
+        <button class="like" onclick="likePost(this)">
+          👍 Like <span>0</span>
+        </button>
+
+        <button onclick="alert('Comments coming soon!')">
+          💬 Comment
+        </button>
+      `;
+
+      document.getElementById("posts").prepend(post);
+
+      document.getElementById("postText").value = "";
+    }
+
+    function likePost(button) {
+      const number = button.querySelector("span");
+      number.textContent = Number(number.textContent) + 1;
+    }
+  </script>
+
+</body>
+  </html>
