@@ -22,6 +22,7 @@
   const authUsername = document.getElementById('authUsername');
   const authPassword = document.getElementById('authPassword');
   const authBio = document.getElementById('authBio');
+  const authReferral = document.getElementById('authReferral');
   const myProfileBtn = document.getElementById('myProfileBtn');
   const newPostBtn = document.getElementById('newPostBtn');
   const followingList = document.getElementById('followingList');
@@ -45,6 +46,18 @@
   function uid(){ return Math.floor(Math.random()*1e9); }
   function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+  // Generate a short unique referral code
+  function generateReferralCode(username){
+    const users = loadUsers();
+    let code;
+    do {
+      const rand = Math.random().toString(36).slice(2,8).toUpperCase();
+      const base = (username||'user').toString().slice(0,4).toUpperCase();
+      code = `${base}-${rand}`;
+    } while(users.some(u=>u.referralCode === code));
+    return code;
+  }
+
   // Data helpers
   function loadUsers(){ return lsGet(USERS_KEY, []); }
   function saveUsers(u){ lsSet(USERS_KEY,u); }
@@ -56,12 +69,18 @@
   function setCurrentUser(u){ lsSet(CURRENT_KEY,u); renderAccountArea(); updateBadges(); }
   function clearCurrentUser(){ localStorage.removeItem(CURRENT_KEY); renderAccountArea(); updateBadges(); }
 
+  // Count successful referrals for a user
+  function countReferrals(username){
+    const users = loadUsers();
+    return users.filter(u => u.referredBy === username).length;
+  }
+
   // Bootstrap seeded data
   function seed(){
     if(!localStorage.getItem(USERS_KEY)){
       const users = [
-        {username:'alice', password:'alice', profile:{bio:'Loves decentralized social', location:'Lagos'}, following:[], followers:[]},
-        {username:'bob', password:'bob', profile:{bio:'Build fast things', location:'Abuja'}, following:[], followers:[]}
+        {username:'alice', password:'alice', profile:{bio:'Loves decentralized social', location:'Lagos'}, following:[], followers:[], referralCode: generateReferralCode('alice'), referredBy: null},
+        {username:'bob', password:'bob', profile:{bio:'Build fast things', location:'Abuja'}, following:[], followers:[], referralCode: generateReferralCode('bob'), referredBy: null}
       ];
       saveUsers(users);
     }
@@ -88,18 +107,37 @@
     const u = (authUsername.value||'').trim();
     const p = authPassword.value||'';
     const bio = authBio.value||'';
+    const referralInput = (authReferral && authReferral.value) ? authReferral.value.trim() : '';
+
     if(!u || !p){ showAuthMsg('Please provide both username and password.'); return; }
     const users = loadUsers();
     if(authMode==='register'){
       if(users.find(x=>x.username.toLowerCase()===u.toLowerCase())){ showAuthMsg('Username already taken.'); return; }
-      const newUser = {username:u,password:p,profile:{bio,location:''}, followers:[], following:[]};
-      users.push(newUser); saveUsers(users); setCurrentUser({username:u}); showAuthMsg('Account created.'); closeAuth(); renderAll();
+
+      // If referral code provided, find owner
+      let referredBy = null;
+      if(referralInput){
+        const refOwner = users.find(x => x.referralCode && x.referralCode.toLowerCase() === referralInput.toLowerCase());
+        if(refOwner){
+          if(refOwner.username.toLowerCase() === u.toLowerCase()){
+            showAuthMsg('You cannot use your own referral code.'); return;
+          }
+          referredBy = refOwner.username;
+        } else {
+          // If code not found, ignore but inform the user
+          showAuthMsg('Referral code not found. Proceeding without a referrer.', false);
+        }
+      }
+
+      const newUser = {username:u,password:p,profile:{bio,location:''}, followers:[], following:[], referralCode: generateReferralCode(u), referredBy: referredBy || null};
+      users.push(newUser); saveUsers(users); setCurrentUser({username:u});
+      showAuthMsg('Account created.'); closeAuth(); renderAll();
     } else {
       const found = users.find(x=>x.username.toLowerCase()===u.toLowerCase() && x.password===p);
       if(!found){ showAuthMsg('Invalid username or password.'); return; }
       setCurrentUser({username:found.username}); showAuthMsg('Logged in.'); closeAuth(); renderAll();
     }
-    authUsername.value=''; authPassword.value=''; authBio.value='';
+    authUsername.value=''; authPassword.value=''; authBio.value=''; if(authReferral) authReferral.value='';
   }
   authSubmit.addEventListener('click', submitAuth);
 
@@ -108,17 +146,36 @@
     const user = currentUser();
     if(user){
       const u = loadUsers().find(x=>x.username===user.username);
-      accountAreaMain.innerHTML = `<div><div style=\"font-weight:700\">${escapeHtml(user.username)}</div><div class=\"small\">${escapeHtml((u.profile && u.profile.bio)||'')}</div></div><div style=\"margin-top:8px\"><button class=\"btn\" id=\"logoutBtn\">Log out</button> <button class=\"btn secondary\" id=\"editProfileBtn\">Edit profile</button></div>`;
+      const referrals = countReferrals(user.username);
+      const code = u.referralCode || generateReferralCode(u.username);
+      accountAreaMain.innerHTML = `<div><div style="font-weight:700">${escapeHtml(user.username)}</div><div class="small">${escapeHtml((u.profile && u.profile.bio)||'')}</div></div>
+        <div style="margin-top:8px">Referral: <strong>${escapeHtml(code)}</strong> <button class="btn secondary" id="shareRefBtn">Share my referral code</button><div class="small" style="margin-top:6px">Successful referrals: ${referrals}</div></div>
+        <div style="margin-top:8px"><button class="btn" id="logoutBtn">Log out</button> <button class="btn secondary" id="editProfileBtn">Edit profile</button></div>`;
       document.getElementById('logoutBtn').addEventListener('click', ()=>{ clearCurrentUser(); renderAll(); });
       document.getElementById('editProfileBtn').addEventListener('click', ()=>{ openProfileEdit(user.username); });
-      profileMenu.innerHTML = `<button class=\"btn secondary\" onclick=\"openProfileFor('${user.username}')\">Profile</button>`;
+      document.getElementById('shareRefBtn').addEventListener('click', ()=>{ shareReferral(user.username); });
+      profileMenu.innerHTML = `<button class="btn secondary" onclick="openProfileFor('${user.username}')">Profile</button>`;
     } else {
-      accountAreaMain.innerHTML = `<div><button class=\"btn\" id=\"openAuthBtn\">Create account / Log in</button></div>`;
+      accountAreaMain.innerHTML = `<div><button class="btn" id="openAuthBtn">Create account / Log in</button></div>`;
       document.getElementById('openAuthBtn').addEventListener('click', ()=>{ openAuth(); });
-      profileMenu.innerHTML = `<button class=\"btn\" id=\"openAuthBtn2\">Sign in</button>`;
+      profileMenu.innerHTML = `<button class="btn" id="openAuthBtn2">Sign in</button>`;
       document.getElementById('openAuthBtn2').addEventListener('click', ()=>{ openAuth(); });
     }
     renderFollowingList();
+  }
+
+  // Share referral code (mobile share or clipboard fallback)
+  function shareReferral(username){
+    const users = loadUsers(); const u = users.find(x=>x.username===username); if(!u) return; const code = u.referralCode;
+    const shareText = `Join me on FFConnect! Use my referral code ${code} to sign up.`;
+    const url = location.origin + location.pathname; // current site
+    if(navigator.share){
+      navigator.share({title:'Join FFConnect', text: shareText, url}).catch(()=>{});
+    } else if(navigator.clipboard){
+      navigator.clipboard.writeText(`${shareText} ${url}`).then(()=>{ alert('Referral code copied to clipboard'); });
+    } else {
+      prompt('Copy this referral info', `${shareText} ${url}`);
+    }
   }
 
   // Posts
@@ -211,7 +268,8 @@
 
   function renderProfile(username, opts={}){
     const users = loadUsers(); const u = users.find(x=>x.username===username); if(!u) return; const posts = loadPosts().filter(p=>p.author===username);
-    profileContent.innerHTML = `<div><h3>${escapeHtml(u.username)}</h3><div class=\"small\">${escapeHtml(u.profile.bio||'')}</div><div class=\"small\">${escapeHtml(u.profile.location||'')}</div></div><div style=\"margin-top:10px\" id=\"profileActions\"></div><div style=\"margin-top:12px\"><h4>Posts</h4><div id=\"profilePosts\"></div></div>`;
+    const referrals = countReferrals(username);
+    profileContent.innerHTML = `<div><h3>${escapeHtml(u.username)}</h3><div class=\"small\">${escapeHtml(u.profile.bio||'')}</div><div class=\"small\">${escapeHtml(u.profile.location||'')}</div><div style=\"margin-top:8px\">Referral code: <strong>${escapeHtml(u.referralCode||'')}</strong> <button class=\"btn secondary\" id=\"shareProfileRef\">Share</button><div class=\"small\">Successful referrals: ${referrals}</div></div></div><div style=\"margin-top:10px\" id=\"profileActions\"></div><div style=\"margin-top:12px\"><h4>Posts</h4><div id=\"profilePosts\"></div></div>`;
     const actions = document.getElementById('profileActions');
     const current = currentUser();
     if(current && current.username===username){ actions.innerHTML = `<button class=\"btn\" id=\"editProfile\">Edit profile</button>`; document.getElementById('editProfile').addEventListener('click', ()=>{ renderProfile(username,{edit:true}); }); }
@@ -220,6 +278,10 @@
       actions.innerHTML = `<button class=\"btn\" id=\"followBtn\">${isFollowing? 'Unfollow':'Follow'}</button>`;
       document.getElementById('followBtn').addEventListener('click', ()=>{ toggleFollow(username); renderProfile(username); renderAll(); });
     } else { actions.innerHTML = `<button class=\"btn\" onclick=\"openAuth()\">Sign in to follow</button>`; }
+
+    // Hook up share for profile referral
+    const shareProfileBtn = document.getElementById('shareProfileRef');
+    if(shareProfileBtn){ shareProfileBtn.addEventListener('click', ()=>{ shareReferral(username); }); }
 
     // If edit mode
     if(opts.edit){ profileContent.innerHTML = `<div><h3>Edit profile</h3><input id=\"editBio\" placeholder=\"Bio\" value=\"${escapeHtml(u.profile.bio||'')}\" /><input id=\"editLocation\" placeholder=\"Location\" value=\"${escapeHtml(u.profile.location||'')}\" /><div class=\"row\"><button class=\"btn\" id=\"saveProfile\">Save</button><button class=\"btn secondary\" id=\"cancelEdit\">Cancel</button></div></div>`; document.getElementById('saveProfile').addEventListener('click', ()=>{ const bio = document.getElementById('editBio').value; const loc = document.getElementById('editLocation').value; u.profile.bio = bio; u.profile.location = loc; saveUsers(users); renderProfile(username); renderAll(); }); document.getElementById('cancelEdit').addEventListener('click', ()=>{ renderProfile(username); }); return; }
