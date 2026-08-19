@@ -1,295 +1,837 @@
-// app.js — core FFConnect logic (client-side, progressive foundation)
-(function(){
-// Keys
-const USERS_KEY = 'ff_users_v2';
-const POSTS_KEY = 'ff_posts_v2';
-const CURRENT_KEY = 'ff_current_v2';
-const NOTIF_KEY = 'ff_notifications_v2';
+document.addEventListener("DOMContentLoaded", () => {
+  const USERS = "ff_users_v3";
+  const POSTS = "ff_posts_v3";
+  const CURRENT = "ff_current_v3";
+  const NOTIFS = "ff_notifs_v3";
 
-// DOM
-const searchInput = document.getElementById('searchInput');
-const searchBtn = document.getElementById('searchBtn');
-const feedList = document.getElementById('feedList');
-const postText = document.getElementById('postText');
-const postCreateBtn = document.getElementById('postCreateBtn');
-const accountArea = document.getElementById('accountArea');
-const profileMenu = document.getElementById('profileMenu');
-const authModal = document.getElementById('authModal');
-const authSubmit = document.getElementById('authSubmit');
-const authToggle = document.getElementById('authToggle');
-const authTitle = document.getElementById('authTitle');
-const authMsg = document.getElementById('authMsg');
-const authUsername = document.getElementById('authUsername');
-const authPassword = document.getElementById('authPassword');
-const authBio = document.getElementById('authBio');
-const authReferral = document.getElementById('authReferral');
-const myProfileBtn = document.getElementById('myProfileBtn');
-const newPostBtn = document.getElementById('newPostBtn');
-const followingList = document.getElementById('followingList');
-const suggestionsList = document.getElementById('suggestionsList');
-const notificationsDrawer = document.getElementById('notificationsDrawer');
-const notifBtn = document.getElementById('notifBtn');
-const notifBadge = document.getElementById('notifBadge');
-const notificationsList = document.getElementById('notificationsList');
-const accountAreaMain = accountArea;
-const searchResults = document.getElementById('searchResults');
-const profileDrawer = document.getElementById('profileDrawer');
-const profileContent = document.getElementById('profileContent');
+  const $ = id => document.getElementById(id);
 
-// State
-let authMode = 'register'; // or 'login'
+  const searchInput = $("searchInput");
+  const searchBtn = $("searchBtn");
+  const feedList = $("feedList");
+  const postText = $("postText");
+  const postCreateBtn = $("postCreateBtn");
+  const accountArea = $("accountArea");
+  const profileMenu = $("profileMenu");
+  const authModal = $("authModal");
+  const authSubmit = $("authSubmit");
+  const authToggle = $("authToggle");
+  const authTitle = $("authTitle");
+  const authMsg = $("authMsg");
+  const authUsername = $("authUsername");
+  const authPassword = $("authPassword");
+  const authBio = $("authBio");
+  const authReferral = $("authReferral");
+  const followingList = $("followingList");
+  const suggestionsList = $("suggestionsList");
+  const notificationsDrawer = $("notificationsDrawer");
+  const notifBtn = $("notifBtn");
+  const notifBadge = $("notifBadge");
+  const notificationsList = $("notificationsList");
+  const searchResults = $("searchResults");
+  const profileDrawer = $("profileDrawer");
+  const profileContent = $("profileContent");
+  const newPostBtn = $("newPostBtn");
+  const myProfileBtn = $("myProfileBtn");
+  const createPostCard = $("createPostCard");
 
-// Utilities
-function lsGet(key, def){ try{ return JSON.parse(localStorage.getItem(key))||def; }catch(e){return def;} }
-function lsSet(key,val){ localStorage.setItem(key, JSON.stringify(val)); }
-function now(){ return Date.now(); }
-function uid(){ return Math.floor(Math.random()*1e9); }
-function escapeHtml(s){ return String(s).replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>'); }
+  let authMode = "register";
+  let mediaFiles = [];
 
-// Generate a short unique referral code
-function generateReferralCode(username){
-const users = loadUsers();
-let code;
-do {
-const rand = Math.random().toString(36).slice(2,8).toUpperCase();
-const base = (username||'user').toString().slice(0,4).toUpperCase();
-code = ${base}-${rand};
-} while(users.some(u=>u.referralCode === code));
-return code;
-}
+  function get(key, fallback) {
+    try {
+      const value = localStorage.getItem(key);
+      return value ? JSON.parse(value) : fallback;
+    } catch {
+      return fallback;
+    }
+  }
 
-// Data helpers
-function loadUsers(){ return lsGet(USERS_KEY, []); }
-function saveUsers(u){ lsSet(USERS_KEY,u); }
-function loadPosts(){ return lsGet(POSTS_KEY, []); }
-function savePosts(p){ lsSet(POSTS_KEY,p); }
-function loadNotifs(){ return lsGet(NOTIF_KEY, []); }
-function saveNotifs(n){ lsSet(NOTIF_KEY,n); }
-function currentUser(){ return lsGet(CURRENT_KEY, null); }
-function setCurrentUser(u){ lsSet(CURRENT_KEY,u); renderAccountArea(); updateBadges(); }
-function clearCurrentUser(){ localStorage.removeItem(CURRENT_KEY); renderAccountArea(); updateBadges(); }
+  function set(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
 
-// Count successful referrals for a user
-function countReferrals(username){
-const users = loadUsers();
-return users.filter(u => u.referredBy === username).length;
-}
+  function users() {
+    return get(USERS, []);
+  }
 
-// Bootstrap seeded data
-function seed(){
-if(!localStorage.getItem(USERS_KEY)){
-const users = [
-{username:'alice', password:'alice', profile:{bio:'Loves decentralized social', location:'Lagos'}, following:[], followers:[], referralCode: generateReferralCode('alice'), referredBy: null},
-{username:'bob', password:'bob', profile:{bio:'Build fast things', location:'Abuja'}, following:[], followers:[], referralCode: generateReferralCode('bob'), referredBy: null}
-];
-saveUsers(users);
-}
-if(!localStorage.getItem(POSTS_KEY)){
-const posts = [
-{id:uid(), author:'alice', text:'Welcome to FFConnect — an original social space!', likes:[], comments:[], createdAt: now()},
-{id:uid(), author:'bob', text:'Try following someone and leaving a comment.', likes:[], comments:[], createdAt: now()}
-];
-savePosts(posts);
-}
-if(!localStorage.getItem(NOTIF_KEY)) saveNotifs([]);
-}
+  function posts() {
+    return get(POSTS, []);
+  }
 
-// Auth
-function openAuth(){ authModal.setAttribute('aria-hidden','false'); authModal.style.display='flex'; authMsg.textContent=''; }
-function closeAuth(){ authModal.setAttribute('aria-hidden','true'); authModal.style.display='none'; }
+  function current() {
+    return get(CURRENT, null);
+  }
 
-function toggleAuthMode(){ authMode = (authMode==='register')? 'login':'register'; authTitle.textContent = (authMode==='register')?'Create an account':'Log in'; authSubmit.textContent = (authMode==='register')?'Create account':'Log in'; authToggle.textContent = (authMode==='register')?'Switch to Log in':'Switch to Create'; authMsg.textContent=''; }
-authToggle.addEventListener('click', toggleAuthMode);
+  function notifications() {
+    return get(NOTIFS, []);
+  }
 
-function showAuthMsg(msg, ok){ authMsg.textContent = msg; authMsg.style.color = ok ? '#16a34a' : '#b91c1c'; }
+  function saveUsers(x) {
+    set(USERS, x);
+  }
 
-function submitAuth(){
-const u = (authUsername.value||'').trim();
-const p = authPassword.value||'';
-const bio = authBio.value||'';
-const referralInput = (authReferral && authReferral.value) ? authReferral.value.trim() : '';
+  function savePosts(x) {
+    set(POSTS, x);
+  }
 
-if(!u || !p){ showAuthMsg('Please provide both username and password.'); return; }  
-const users = loadUsers();  
-if(authMode==='register'){  
-  if(users.find(x=>x.username.toLowerCase()===u.toLowerCase())){ showAuthMsg('Username already taken.'); return; }  
+  function saveNotifications(x) {
+    set(NOTIFS, x);
+  }
 
-  // If referral code provided, find owner  
-  let referredBy = null;  
-  if(referralInput){  
-    const refOwner = users.find(x => x.referralCode && x.referralCode.toLowerCase() === referralInput.toLowerCase());  
-    if(refOwner){  
-      if(refOwner.username.toLowerCase() === u.toLowerCase()){  
-        showAuthMsg('You cannot use your own referral code.'); return;  
-      }  
-      referredBy = refOwner.username;  
-    } else {  
-      // If code not found, ignore but inform the user  
-      showAuthMsg('Referral code not found. Proceeding without a referrer.', false);  
-    }  
-  }  
+  function id() {
+    return Date.now() + Math.floor(Math.random() * 10000);
+  }
 
-  const newUser = {username:u,password:p,profile:{bio,location:''}, followers:[], following:[], referralCode: generateReferralCode(u), referredBy: referredBy || null};  
-  users.push(newUser); saveUsers(users); setCurrentUser({username:u});  
-  showAuthMsg('Account created.'); closeAuth(); renderAll();  
-} else {  
-  const found = users.find(x=>x.username.toLowerCase()===u.toLowerCase() && x.password===p);  
-  if(!found){ showAuthMsg('Invalid username or password.'); return; }  
-  setCurrentUser({username:found.username}); showAuthMsg('Logged in.'); closeAuth(); renderAll();  
-}  
-authUsername.value=''; authPassword.value=''; authBio.value=''; if(authReferral) authReferral.value='';
+  function safe(text) {
+    return String(text || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
 
-}
-authSubmit.addEventListener('click', submitAuth);
+  function currentUser() {
+    const c = current();
+    if (!c) return null;
+    return users().find(u => u.username === c.username) || null;
+  }
 
-// Account UI
-function renderAccountArea(){
-const user = currentUser();
-if(user){
-const u = loadUsers().find(x=>x.username===user.username);
-const referrals = countReferrals(user.username);
-const code = u.referralCode || generateReferralCode(u.username);
-accountAreaMain.innerHTML = <div><div style="font-weight:700">${escapeHtml(user.username)}</div><div class="small">${escapeHtml((u.profile && u.profile.bio)||'')}</div></div>   <div style="margin-top:8px">Referral: <strong>${escapeHtml(code)}</strong> <button class="btn secondary" id="shareRefBtn">Share my referral code</button><div class="small" style="margin-top:6px">Successful referrals: ${referrals}</div></div>   <div style="margin-top:8px"><button class="btn" id="logoutBtn">Log out</button> <button class="btn secondary" id="editProfileBtn">Edit profile</button></div>;
-document.getElementById('logoutBtn').addEventListener('click', ()=>{ clearCurrentUser(); renderAll(); });
-document.getElementById('editProfileBtn').addEventListener('click', ()=>{ openProfileEdit(user.username); });
-document.getElementById('shareRefBtn').addEventListener('click', ()=>{ shareReferral(user.username); });
-profileMenu.innerHTML = <button class="btn secondary" onclick="openProfileFor('${user.username}')">Profile</button>;
-} else {
-accountAreaMain.innerHTML = <div><button class="btn" id="openAuthBtn">Create account / Log in</button></div>;
-document.getElementById('openAuthBtn').addEventListener('click', ()=>{ openAuth(); });
-profileMenu.innerHTML = <button class="btn" id="openAuthBtn2">Sign in</button>;
-document.getElementById('openAuthBtn2').addEventListener('click', ()=>{ openAuth(); });
-}
-renderFollowingList();
-}
+  /* ---------------- AUTH ---------------- */
 
-// Share referral code (mobile share or clipboard fallback)
-function shareReferral(username){
-const users = loadUsers(); const u = users.find(x=>x.username===username); if(!u) return; const code = u.referralCode;
-const shareText = Join me on FFConnect! Use my referral code ${code} to sign up.;
-const url = location.origin + location.pathname; // current site
-if(navigator.share){
-navigator.share({title:'Join FFConnect', text: shareText, url}).catch(()=>{});
-} else if(navigator.clipboard){
-navigator.clipboard.writeText(${shareText} ${url}).then(()=>{ alert('Referral code copied to clipboard'); });
-} else {
-prompt('Copy this referral info', ${shareText} ${url});
-}
-}
+  function openAuth() {
+    if (!authModal) return;
+    authModal.style.display = "flex";
+    authModal.setAttribute("aria-hidden", "false");
+  }
 
-// Posts
-function createPost(){
-const text = (postText.value||'').trim();
-if(!text){ alert('Please write something first.'); return; }
-const user = currentUser();
-if(!user){ openAuth(); return; }
-const posts = loadPosts();
-const p = {id:uid(), author:user.username, text, likes:[], comments:[], createdAt: now()};
-posts.unshift(p); savePosts(posts); postText.value=''; renderFeed();
-}
-postCreateBtn.addEventListener('click', createPost);
-newPostBtn.addEventListener('click', ()=>{ window.scrollTo({top:0,behavior:'smooth'}); document.getElementById('postText').focus(); });
+  function closeAuth() {
+    if (!authModal) return;
+    authModal.style.display = "none";
+    authModal.setAttribute("aria-hidden", "true");
+  }
 
-function renderFeed(){
-const posts = loadPosts();
-feedList.innerHTML='';
-if(posts.length===0) feedList.innerHTML='<div class="card small">No posts yet.</div>';
-posts.forEach(p=>{
-const el = document.createElement('div'); el.className='post card';
-el.innerHTML =   <div class="meta"><div><strong>${escapeHtml(p.author)}</strong> <div class="small">${new Date(p.createdAt).toLocaleString()}</div></div><div><button class="btn secondary" onclick="openProfileFor('${p.author}')">View</button></div></div>   <div class="text">${escapeHtml(p.text)}</div>   <div class="actions">   <button class="like-btn" data-id="${p.id}">👍 <span class="like-count">${(p.likes||[]).length}</span></button>   <button class="btn secondary comment-toggle" data-id="${p.id}">💬 Comment (${(p.comments||[]).length})</button>   </div>   <div class="comment-area" id="comments-${p.id}" style="display:none"></div>  ;
-feedList.appendChild(el);
-});
+  function showAuth(message, good = false) {
+    if (!authMsg) return;
+    authMsg.textContent = message;
+    authMsg.style.color = good ? "green" : "red";
+  }
 
-// attach handlers  
-document.querySelectorAll('.like-btn').forEach(btn=>{  
-  btn.addEventListener('click', ()=>{  
-    const id = Number(btn.dataset.id);  
-    toggleLike(id);  
-  });  
-});  
-document.querySelectorAll('.comment-toggle').forEach(btn=>{  
-  btn.addEventListener('click', ()=>{  
-    const id = Number(btn.dataset.id); toggleComments(id);  
-  });  
-});
+  function switchAuth() {
+    authMode = authMode === "register" ? "login" : "register";
 
-}
+    if (authTitle)
+      authTitle.textContent =
+        authMode === "register" ? "Create an account" : "Log in";
 
-function toggleLike(postId){
-const user = currentUser(); if(!user){ openAuth(); return; }
-const posts = loadPosts(); const p = posts.find(x=>x.id===postId); if(!p) return;
-const ix = (p.likes||[]).indexOf(user.username);
-if(ix===-1){ p.likes.push(user.username); addNotification(p.author, ${user.username} liked your post.); }
-else { p.likes.splice(ix,1); }
-savePosts(posts); renderFeed(); updateBadges();
-}
+    if (authSubmit)
+      authSubmit.textContent =
+        authMode === "register" ? "Create account" : "Log in";
 
-function toggleComments(postId){
-const area = document.getElementById('comments-'+postId);
-if(!area) return; area.style.display = (area.style.display==='none') ? 'block' : 'none';
-renderComments(postId);
-}
+    if (authToggle)
+      authToggle.textContent =
+        authMode === "register"
+          ? "Switch to Log in"
+          : "Switch to Create";
 
-function renderComments(postId){
-const posts = loadPosts(); const p = posts.find(x=>x.id===postId); if(!p) return;
-const area = document.getElementById('comments-'+postId); area.innerHTML='';
-const form = document.createElement('div'); form.className='comment-form';
-form.innerHTML = <textarea id="comment-input-${postId}" placeholder="Write a comment..."></textarea><div class=\"row\"><button class=\"btn\" id=\"comment-submit-${postId}\">Reply</button></div>;
-area.appendChild(form);
-const list = document.createElement('div'); list.className='comment-list';
-(p.comments||[]).forEach(c=>{
-const ce = document.createElement('div'); ce.className='comment'; ce.innerHTML = <div><strong>${escapeHtml(c.author)}</strong> <span class="small">${new Date(c.createdAt).toLocaleString()}</span></div><div>${escapeHtml(c.text)}</div>; list.appendChild(ce);
-});
-area.appendChild(list);
-document.getElementById(comment-submit-${postId}).addEventListener('click', ()=>{ submitComment(postId); });
-}
+    showAuth("");
+  }
 
-function submitComment(postId){
-const user = currentUser(); if(!user){ openAuth(); return; }
-const input = document.getElementById('comment-input-'+postId); if(!input) return; const text = (input.value||'').trim(); if(!text) return;
-const posts = loadPosts(); const p = posts.find(x=>x.id===postId); if(!p) return; p.comments = p.comments||[]; p.comments.push({id:uid(),author:user.username,text,createdAt:now()}); savePosts(posts); renderComments(postId); addNotification(p.author, ${user.username} commented on your post.); renderFeed(); updateBadges();
-}
+  function registerOrLogin() {
+    const username = (authUsername?.value || "").trim();
+    const password = authPassword?.value || "";
+    const bio = (authBio?.value || "").trim();
+    const referral = (authReferral?.value || "").trim();
 
-// Profiles
-function openProfileFor(username){ openProfile(); renderProfile(username); }
-window.openProfileFor = openProfileFor; // expose for inline onclicks
+    if (!username || !password) {
+      showAuth("Enter username and password.");
+      return;
+    }
 
-function openProfile(){ profileDrawer.setAttribute('aria-hidden','false'); profileDrawer.style.display='block'; }
-function closeProfile(){ profileDrawer.setAttribute('aria-hidden','true'); profileDrawer.style.display='none'; }
-function openProfileEdit(username){ openProfile(); renderProfile(username, {edit:true}); }
+    const list = users();
 
-function renderProfile(username, opts={}){
-const users = loadUsers(); const u = users.find(x=>x.username===username); if(!u) return; const posts = loadPosts().filter(p=>p.author===username);
-const referrals = countReferrals(username);
-profileContent.innerHTML = <div><h3>${escapeHtml(u.username)}</h3><div class=\"small\">${escapeHtml(u.profile.bio||'')}</div><div class=\"small\">${escapeHtml(u.profile.location||'')}</div><div style=\"margin-top:8px\">Referral code: <strong>${escapeHtml(u.referralCode||'')}</strong> <button class=\"btn secondary\" id=\"shareProfileRef\">Share</button><div class=\"small\">Successful referrals: ${referrals}</div></div></div><div style=\"margin-top:10px\" id=\"profileActions\"></div><div style=\"margin-top:12px\"><h4>Posts</h4><div id=\"profilePosts\"></div></div>;
-const actions = document.getElementById('profileActions');
-const current = currentUser();
-if(current && current.username===username){ actions.innerHTML = <button class=\"btn\" id=\"editProfile\">Edit profile</button>; document.getElementById('editProfile').addEventListener('click', ()=>{ renderProfile(username,{edit:true}); }); }
-else if(current){
-const isFollowing = u.followers && u.followers.includes(current.username);
-actions.innerHTML = <button class=\"btn\" id=\"followBtn\">${isFollowing? 'Unfollow':'Follow'}</button>;
-document.getElementById('followBtn').addEventListener('click', ()=>{ toggleFollow(username); renderProfile(username); renderAll(); });
-} else { actions.innerHTML = <button class=\"btn\" onclick=\"openAuth()\">Sign in to follow</button>; }
+    if (authMode === "register") {
+      if (
+        list.some(
+          u => u.username.toLowerCase() === username.toLowerCase()
+        )
+      ) {
+        showAuth("Username already exists.");
+        return;
+      }
 
-// Hook up share for profile referral  
-const shareProfileBtn = document.getElementById('shareProfileRef');  
-if(shareProfileBtn){ shareProfileBtn.addEventListener('click', ()=>{ shareReferral(username); }); }  
+      let referredBy = null;
 
-// If edit mode  
-if(opts.edit){ profileContent.innerHTML = `<div><h3>Edit profile</h3><input id=\"editBio\" placeholder=\"Bio\" value=\"${escapeHtml(u.profile.bio||'')}\" /><input id=\"editLocation\" placeholder=\"Location\" value=\"${escapeHtml(u.profile.location||'')}\" /><div class=\"row\"><button class=\"btn\" id=\"saveProfile\">Save</button><button class=\"btn secondary\" id=\"cancelEdit\">Cancel</button></div></div>`; document.getElementById('saveProfile').addEventListener('click', ()=>{ const bio = document.getElementById('editBio').value; const loc = document.getElementById('editLocation').value; u.profile.bio = bio; u.profile.location = loc; saveUsers(users); renderProfile(username); renderAll(); }); document.getElementById('cancelEdit').addEventListener('click', ()=>{ renderProfile(username); }); return; }  
+      if (referral) {
+        const ref = list.find(
+          u =>
+            u.referralCode &&
+            u.referralCode.toLowerCase() === referral.toLowerCase()
+        );
 
-// Render posts  
-const pp = document.getElementById('profilePosts'); pp.innerHTML=''; posts.forEach(p=>{ const el = document.createElement('div'); el.className='post'; el.innerHTML = `<div><strong>${escapeHtml(p.author)}</strong> <span class=\"small\">${new Date(p.createdAt).toLocaleString()}</span></div><div class=\"text\">${escapeHtml(p.text)}</div><div class=\"actions\"><button class=\"like-btn\" data-id=\"${p.id}\">👍 <span class=\"like-count\">${(p.likes||[]).length}</span></button> <button class=\"btn secondary comment-toggle\" data-id=\"${p.id}\">💬</button></div><div id=\"comments-${p.id}\" class=\"comment-area\"></div>`; pp.appendChild(el); });  
-// attach handlers  
-pp.querySelectorAll('.like-btn').forEach(b=>b.addEventListener('click', ()=>{ toggleLike(Number(b.dataset.id)); }));  
-pp.querySelectorAll('.comment-toggle').forEach(b=>b.addEventListener('click', ()=>{ toggleComments(Number(b.dataset.id)); }));
+        if (!ref) {
+          showAuth("Referral code not found.");
+          return;
+        }
 
-}
+        referredBy = ref.username;
+      }
 
-// Follow system
-function toggleFollow(target){ const user = currentUser(); if(!user){ openAuth(); return; } const users = loadUsers(); const me = users.find(x=>x.username===user.username); const them = users.find(x=>x.username===target); if(!me||!them) return; me.following = me.following||[]; them.followers = them.followers||[]; const i = me.following.indexOf(target); if(i===-1){ me.following.push(target); if(!them.followers.includes(me.username)) them.followers.push(me.username); addNotification(target, ${me.username} started following you.); } else { me.following.splice(i,1); const j = them.followers.indexOf(me.username); if(j>-1) them.followers.splice(j,1); } saveUsers(users); renderFollowingList(); }
+      const newUser = {
+        username,
+        password,
+        profile: {
+          bio,
+          location: ""
+        },
+        followers: [],
+        following: [],
+        referralCode:
+          username.substring(0, 4).toUpperCase() +
+          "-" +
+          Math.random().toString(36).substring(2, 8).toUpperCase(),
+        referredBy
+      };
 
-function renderFollowingList(){ const user = currentUser(); followingList.innerHTML=''; if(!user) return; const u = loadUsers().find(x=>x.username===user.username); if(!u||!u.following) return; u.following.forEach(f=>{ const li = document.createElement('li'); li.innerHTML = <button class=\"btn secondary\" onclick=\"openProfileFor('${f}')\">${escapeHtml(f)}</button>; followingList.appendChild(li); }); }
+      list.push(newUser);
+      saveUsers(list);
 
-function renderSuggestions(){ suggestionsList.innerHTML=''; const users = loadUsers(); const current = currentUser(); const candidates = users.filter(u=>!current||u.username!==current.username).slice(0,5); candidates.forEach(u=>{ const li = document.createElement('li'); li.innerHTML = <div><strong>${escapeHtml(u.username)}</strong><div class=\"small\">${escapeHtml(u.profile.bio||'')}</div><div style=\"margin-top:6px\"><button class=\"btn\" onclick=\"openProfileFor('${u.username}')\">View</button> <button class=\"btn secondary\" onclick=\"toggleFollow('${u.username}')\">Follow</button></div></div>; suggestionsList.appendChild(li); }); }
-  
+      set(CURRENT, { username });
+
+      closeAuth();
+      clearAuthFields();
+      renderAll();
+
+      alert("Account created successfully!");
+    } else {
+      const found = list.find(
+        u =>
+          u.username.toLowerCase() === username.toLowerCase() &&
+          u.password === password
+      );
+
+      if (!found) {
+        showAuth("Wrong username or password.");
+        return;
+      }
+
+      set(CURRENT, { username: found.username });
+
+      closeAuth();
+      clearAuthFields();
+      renderAll();
+
+      alert("Logged in successfully!");
+    }
+  }
+
+  function clearAuthFields() {
+    if (authUsername) authUsername.value = "";
+    if (authPassword) authPassword.value = "";
+    if (authBio) authBio.value = "";
+    if (authReferral) authReferral.value = "";
+  }
+
+  /* ---------------- ACCOUNT ---------------- */
+
+  function logout() {
+    localStorage.removeItem(CURRENT);
+    renderAll();
+  }
+
+  function renderAccount() {
+    if (!accountArea) return;
+
+    const user = currentUser();
+
+    if (!user) {
+      accountArea.innerHTML = `
+        <button class="btn" id="loginAccountBtn">
+          Create account / Log in
+        </button>
+      `;
+
+      const btn = $("loginAccountBtn");
+      if (btn) btn.onclick = openAuth;
+
+      if (profileMenu) {
+        profileMenu.innerHTML = `
+          <button class="btn secondary" id="menuLoginBtn">Sign in</button>
+        `;
+        $("menuLoginBtn").onclick = openAuth;
+      }
+
+      return;
+    }
+
+    const referralCount = users().filter(
+      u => u.referredBy === user.username
+    ).length;
+
+    accountArea.innerHTML = `
+      <div>
+        <strong>${safe(user.username)}</strong>
+        <div class="small">${safe(user.profile?.bio || "")}</div>
+
+        <div style="margin-top:10px">
+          Referral code:
+          <strong>${safe(user.referralCode || "")}</strong>
+        </div>
+
+        <div class="small">
+          Successful referrals: ${referralCount}
+        </div>
+
+        <div style="margin-top:10px">
+          <button class="btn" id="logoutBtn">Log out</button>
+          <button class="btn secondary" id="editAccountBtn">
+            Edit profile
+          </button>
+        </div>
+      </div>
+    `;
+
+    $("logoutBtn").onclick = logout;
+    $("editAccountBtn").onclick = () =>
+      openProfileFor(user.username, true);
+
+    if (profileMenu) {
+      profileMenu.innerHTML = `
+        <button class="btn secondary" id="menuProfileBtn">
+          Profile
+        </button>
+      `;
+      $("menuProfileBtn").onclick = () =>
+        openProfileFor(user.username);
+    }
+  }
+
+  /* ---------------- POSTS ---------------- */
+
+  function createPost() {
+    const user = currentUser();
+
+    if (!user) {
+      openAuth();
+      return;
+    }
+
+    const text = (postText?.value || "").trim();
+
+    if (!text && mediaFiles.length === 0) {
+      alert("Write something or add a photo/video.");
+      return;
+    }
+
+    const newPost = {
+      id: id(),
+      author: user.username,
+      text,
+      media: mediaFiles,
+      likes: [],
+      comments: [],
+      createdAt: Date.now()
+    };
+
+    const list = posts();
+    list.unshift(newPost);
+    savePosts(list);
+
+    mediaFiles = [];
+
+    if (postText) postText.value = "";
+
+    const preview = $("mediaPreview");
+    if (preview) preview.innerHTML = "";
+
+    renderFeed();
+  }
+
+  function renderFeed() {
+    if (!feedList) return;
+
+    const list = posts();
+
+    feedList.innerHTML = "";
+
+    if (!list.length) {
+      feedList.innerHTML =
+        `<div class="card small">No posts yet. Be the first to post!</div>`;
+      return;
+    }
+
+    list.forEach(post => {
+      const article = document.createElement("div");
+      article.className = "post card";
+
+      article.innerHTML = `
+        <div class="meta">
+          <div>
+            <strong>${safe(post.author)}</strong>
+            <div class="small">
+              ${new Date(post.createdAt).toLocaleString()}
+            </div>
+          </div>
+
+          <button class="btn secondary view-user">
+            Profile
+          </button>
+        </div>
+
+        ${
+          post.text
+            ? `<div class="text">${safe(post.text)}</div>`
+            : ""
+        }
+
+        <div class="post-media"></div>
+
+        <div class="actions">
+          <button class="like-btn">
+            👍 ${post.likes?.length || 0}
+          </button>
+
+          <button class="btn secondary comment-btn">
+            💬 Comment (${post.comments?.length || 0})
+          </button>
+        </div>
+
+        <div class="comments" style="display:none"></div>
+      `;
+
+      article.querySelector(".view-user").onclick = () =>
+        openProfileFor(post.author);
+
+      article.querySelector(".like-btn").onclick = () =>
+        toggleLike(post.id);
+
+      article.querySelector(".comment-btn").onclick = () => {
+        const area = article.querySelector(".comments");
+        area.style.display =
+          area.style.display === "none" ? "block" : "none";
+        renderComments(post.id, area);
+      };
+
+      const mediaBox = article.querySelector(".post-media");
+
+      (post.media || []).forEach(m => {
+        if (m.type === "image") {
+          const img = document.createElement("img");
+          img.src = m.data;
+          img.style.maxWidth = "100%";
+          img.style.maxHeight = "400px";
+          img.style.borderRadius = "10px";
+          img.style.marginTop = "8px";
+          mediaBox.appendChild(img);
+        }
+
+        if (m.type === "video") {
+          const video = document.createElement("video");
+          video.src = m.data;
+          video.controls = true;
+          video.style.maxWidth = "100%";
+          video.style.maxHeight = "400px";
+          video.style.borderRadius = "10px";
+          video.style.marginTop = "8px";
+          mediaBox.appendChild(video);
+        }
+      });
+
+      feedList.appendChild(article);
+    });
+  }
+
+  function toggleLike(postId) {
+    const user = currentUser();
+
+    if (!user) {
+      openAuth();
+      return;
+    }
+
+    const list = posts();
+    const post = list.find(p => p.id === postId);
+
+    if (!post) return;
+
+    post.likes = post.likes || [];
+
+    const index = post.likes.indexOf(user.username);
+
+    if (index === -1) {
+      post.likes.push(user.username);
+
+      if (post.author !== user.username) {
+        addNotification(
+          post.author,
+          `${user.username} liked your post.`
+        );
+      }
+    } else {
+      post.likes.splice(index, 1);
+    }
+
+    savePosts(list);
+    renderFeed();
+  }
+
+  /* ---------------- COMMENTS ---------------- */
+
+  function renderComments(postId, area) {
+    const post = posts().find(p => p.id === postId);
+
+    if (!post || !area) return;
+
+    area.innerHTML = `
+      <textarea
+        class="comment-input"
+        placeholder="Write a comment..."
+        style="width:100%;min-height:50px"
+      ></textarea>
+
+      <button class="btn comment-send">
+        Reply
+      </button>
+
+      <div class="comment-list"></div>
+    `;
+
+    area.querySelector(".comment-send").onclick = () => {
+      const input = area.querySelector(".comment-input");
+      const text = input.value.trim();
+
+      if (!text) return;
+
+      const user = currentUser();
+
+      if (!user) {
+        openAuth();
+        return;
+      }
+
+      const list = posts();
+      const target = list.find(p => p.id === postId);
+
+      target.comments = target.comments || [];
+
+      target.comments.push({
+        id: id(),
+        author: user.username,
+        text,
+        createdAt: Date.now()
+      });
+
+      savePosts(list);
+
+      if (target.author !== user.username) {
+        addNotification(
+          target.author,
+          `${user.username} commented on your post.`
+        );
+      }
+
+      renderFeed();
+    };
+
+    const commentList = area.querySelector(".comment-list");
+
+    (post.comments || []).forEach(comment => {
+      const div = document.createElement("div");
+      div.className = "comment";
+      div.style.marginTop = "8px";
+
+      div.innerHTML = `
+        <strong>${safe(comment.author)}</strong>
+        <div>${safe(comment.text)}</div>
+        <div class="small">
+          ${new Date(comment.createdAt).toLocaleString()}
+        </div>
+      `;
+
+      commentList.appendChild(div);
+    });
+  }
+
+  /* ---------------- FOLLOW ---------------- */
+
+  function followUser(username) {
+    const me = currentUser();
+
+    if (!me) {
+      openAuth();
+      return;
+    }
+
+    if (me.username === username) return;
+
+    const list = users();
+    const myself = list.find(u => u.username === me.username);
+    const target = list.find(u => u.username === username);
+
+    if (!myself || !target) return;
+
+    myself.following = myself.following || [];
+    target.followers = target.followers || [];
+
+    const index = myself.following.indexOf(username);
+
+    if (index === -1) {
+      myself.following.push(username);
+
+      if (!target.followers.includes(myself.username)) {
+        target.followers.push(myself.username);
+      }
+
+      addNotification(
+        username,
+        `${myself.username} started following you.`
+      );
+    } else {
+      myself.following.splice(index, 1);
+
+      const followerIndex =
+        target.followers.indexOf(myself.username);
+
+      if (followerIndex !== -1) {
+        target.followers.splice(followerIndex, 1);
+      }
+    }
+
+    saveUsers(list);
+
+    renderAll();
+    openProfileFor(username);
+  }
+
+  function renderFollowing() {
+    if (!followingList) return;
+
+    followingList.innerHTML = "";
+
+    const user = currentUser();
+
+    if (!user) return;
+
+    (user.following || []).forEach(name => {
+      const li = document.createElement("li");
+
+      const btn = document.createElement("button");
+      btn.className = "btn secondary";
+      btn.textContent = name;
+      btn.onclick = () => openProfileFor(name);
+
+      li.appendChild(btn);
+      followingList.appendChild(li);
+    });
+  }
+
+  function renderSuggestions() {
+    if (!suggestionsList) return;
+
+    suggestionsList.innerHTML = "";
+
+    const me = currentUser();
+
+    users()
+      .filter(u => !me || u.username !== me.username)
+      .slice(0, 5)
+      .forEach(user => {
+        const div = document.createElement("div");
+        div.className = "card";
+
+        div.innerHTML = `
+          <strong>${safe(user.username)}</strong>
+          <div class="small">${safe(user.profile?.bio || "")}</div>
+        `;
+
+        const view = document.createElement("button");
+        view.className = "btn";
+        view.textContent = "View";
+        view.onclick = () => openProfileFor(user.username);
+
+        const follow = document.createElement("button");
+        follow.className = "btn secondary";
+        follow.textContent =
+          me && user.followers?.includes(me.username)
+            ? "Unfollow"
+            : "Follow";
+
+        follow.onclick = () => followUser(user.username);
+
+        div.appendChild(view);
+        div.appendChild(follow);
+
+        suggestionsList.appendChild(div);
+      });
+  }
+
+  /* ---------------- PROFILE ---------------- */
+
+  function openProfileFor(username, edit = false) {
+    if (!profileDrawer || !profileContent) return;
+
+    profileDrawer.style.display = "block";
+    profileDrawer.setAttribute("aria-hidden", "false");
+
+    renderProfile(username, edit);
+  }
+
+  function closeProfile() {
+    if (!profileDrawer) return;
+
+    profileDrawer.style.display = "none";
+    profileDrawer.setAttribute("aria-hidden", "true");
+  }
+
+  function renderProfile(username, edit = false) {
+    const user = users().find(u => u.username === username);
+
+    if (!user || !profileContent) return;
+
+    if (edit) {
+      profileContent.innerHTML = `
+        <h3>Edit profile</h3>
+
+        <input
+          id="editBio"
+          placeholder="Bio"
+          value="${safe(user.profile?.bio || "")}"
+        >
+
+        <input
+          id="editLocation"
+          placeholder="Location"
+          value="${safe(user.profile?.location || "")}"
+        >
+
+        <button class="btn" id="saveProfileBtn">
+          Save
+        </button>
+
+        <button class="btn secondary" id="cancelProfileBtn">
+          Cancel
+        </button>
+      `;
+
+      $("saveProfileBtn").onclick = () => {
+        const list = users();
+        const u = list.find(x => x.username === username);
+
+        u.profile.bio = $("editBio").value;
+        u.profile.location = $("editLocation").value;
+
+        saveUsers(list);
+
+        renderAll();
+        renderProfile(username);
+      };
+
+      $("cancelProfileBtn").onclick = () =>
+        renderProfile(username);
+
+      return;
+    }
+
+    const me = currentUser();
+    const following =
+      me && user.followers?.includes(me.username);
+
+    profileContent.innerHTML = `
+      <h3>${safe(user.username)}</h3>
+
+      <div class="small">
+        ${safe(user.profile?.bio || "No bio yet.")}
+      </div>
+
+      <div class="small">
+        ${safe(user.profile?.location || "")}
+      </div>
+
+      <p>
+        Followers: ${user.followers?.length || 0}
+        · Following: ${user.following?.length || 0}
+      </p>
+
+      <div id="profileActionArea"></div>
+
+      <hr>
+
+      <h4>Posts</h4>
+
+      <div id="profilePosts"></div>
+    `;
+
+    const actions = $("profileActionArea");
+
+    if (me && me.username === username) {
+      const editBtn = document.createElement("button");
+      editBtn.className = "btn";
+      editBtn.textContent = "Edit profile";
+      editBtn.onclick = () => renderProfile(username, true);
+      actions.appendChild(editBtn);
+    } else if (me) {
+      const followBtn = document.createElement("button");
+      followBtn.className = "btn";
+      followBtn.textContent = following ? "Unfollow" : "Follow";
+      followBtn.onclick = () => followUser(username);
+      actions.appendChild(followBtn);
+    } else {
+      const login = document.createElement("button");
+      login.className = "btn";
+      login.textContent = "Sign in to follow";
+      login.onclick = openAuth;
+      actions.appendChild(login);
+    }
+
+    const profilePosts = $("profilePosts");
+
+    posts()
+      .filter(p => p.author === username)
+      .forEach(post => {
+        const div = document.createElement("div");
+        div.className = "post card";
+
+        div.innerHTML = `
+          <div class="small">
+            ${new Date(post.createdAt).toLocaleString()}
+          </div>
+
+          <div>${safe(post.text || "")}</div>
+
+          <div>
+            👍 ${post.likes?.length || 0}
+          </div>
+        `;
+
+        profilePosts.appendChild(div);
+      });
+  }
+
+  /* ---------------- SEARCH ---------------- */
+
+  function search() {
+    if (!searchResults || !searchInput) return;
+
+    const q = searchInput.value.trim().toLowerCase();
+
+    searchResults.innerHTML = "";
+
+    if (!q) return;
+
+    const foundUsers = users().filter(u =>
+      u.username.toLowerCase().includes(q) ||
+      (u.profile?.bio || "").toLowerCase().includes(q)
+    );
+
+    const foundPosts = posts().filter(p =>
+      (p.text || "").toLowerCase().includes(q)
+    );
+
+    if (!foundUsers.length && !foundPosts.length) {
+      searchResults.innerHTML =
+        `<div class="small">No results found.</div>`;
+      return;
+    }
+
+    foundUsers.forEach(user => {
+      const div = docu
